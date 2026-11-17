@@ -1,24 +1,48 @@
-// A working best-game-01 entry (Node 22, standard library only): the game is this directory's
-// game/ folder, plain static files a desktop browser loads offline (game/index.html and its ES
-// modules, no library and no network request), and the program hands it in. It copies game/ and
-// screenshots/ from beside this file to /output and writes /output/dossier.json, the summary the
-// judge reads, with the vendored make.fun library. A starting point, not a winner: Block Dodger, a
-// plain 2D canvas game where a paddle dodges falling blocks and catches coins, with a title screen,
-// score, lives and levels, game over and restart, flat colours and no sound. Build your own game
-// (any genre, any library you vendor under game/, or none), put your 3 or 4 PNG or JPEG screenshots
-// in screenshots/ (the first by name is the cover) and run it.
+// Star Salvage, a best-game-01 entry (Node 22, standard library only): pilot a salvage drone
+// through an asteroid belt, in this directory's game/ folder — plain static files a desktop
+// browser loads offline (game/index.html and its ES modules, no library and no network request),
+// and the program hands it in. It copies game/ and screenshots/ from beside this file to /output
+// and writes /output/dossier.json, the summary the judge reads, with the vendored make.fun library.
+// The drone flies with inertia, aims its turret with the mouse, and shoots asteroids that split
+// into smaller ones; collected salvage builds a combo up to x5 and raises the level every 15
+// salvage, a shield pickup absorbs one hit, and 75 salvage clears the sector. Three hull, a pause
+// screen, and synthesised WebAudio sound, all drawn on canvas. The 4 screenshots in screenshots/
+// are deterministic scenes (seeded, ?shot=...&seed=1, listed in shots.json); the first by name is
+// the cover.
 //
 // Serve it locally with `node serve.ts`, then open http://localhost:8080.
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 
-import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildDossier } from './vendor/makefun-game.ts';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const out = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
+
+/** Fail at once, with a plain message, when a file the hand-in needs is not beside this file. */
+function requireFile(path: string): void {
+  if (!existsSync(path)) {
+    process.stderr.write(`best game: missing ${path}: the entry cannot be handed in without it\n`);
+    process.exit(2);
+  }
+}
+
+// The page the browser loads, and every screenshot shots.json promises, must be present before
+// anything is copied: a silent partial hand-in would score worse than a clear failure.
+requireFile(join(here, 'game', 'index.html'));
+let expectedShots: string[];
+try {
+  expectedShots = (JSON.parse(readFileSync(join(here, 'shots.json'), 'utf8')) as { name: string }[]).map(
+    (shot) => shot.name,
+  );
+} catch {
+  process.stderr.write('best game: shots.json beside main.ts is not a JSON list of {name} shots\n');
+  process.exit(2);
+}
+for (const name of expectedShots) requireFile(join(here, 'screenshots', name));
 
 mkdirSync(out, { recursive: true });
 cpSync(join(here, 'game'), join(out, 'game'), { recursive: true });
